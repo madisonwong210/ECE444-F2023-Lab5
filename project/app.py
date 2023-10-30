@@ -1,4 +1,5 @@
 import sqlite3
+from functools import wraps
 from pathlib import Path
 
 from flask import Flask, g, render_template, request, session, \
@@ -69,13 +70,24 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('index'))
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            flash('Please log in.')
+            return jsonify({'status': 0, 'message': 'Please log in.'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 @app.route('/delete/<int:post_id>', methods=['GET'])
+@login_required
 def delete_entry(post_id):
     """Deletes post from database."""
     result = {'status': 0, 'message': 'Error'}
     try:
-        db.session.query(models.Post).filter_by(id=post_id).delete()
+        new_id = post_id
+        db.session.query(models.Post).filter_by(id=new_id).delete()
         db.session.commit()
         result = {'status': 1, 'message': "Post Deleted"}
         flash('The entry was deleted.')
@@ -90,6 +102,7 @@ def search():
     if query:
         return render_template('search.html', entries=entries, query=query)
     return render_template('search.html')
+
 
 if __name__ == "__main__":
     app.run()
